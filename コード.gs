@@ -390,6 +390,42 @@ function テキストを追加(スライド, テキスト, オプション) {
           objectId: オブジェクトID,
           text: テキスト
         }
+      },
+      // CRITICAL: autofitを無効化してサイズを固定
+      {
+        updateShapeProperties: {
+          objectId: オブジェクトID,
+          fields: 'autofit',
+          shapeProperties: {
+            autofit: {
+              autofitType: 'NONE'
+            }
+          }
+        }
+      },
+      // サイズを再度明示的に設定
+      {
+        updatePageElementSize: {
+          objectId: オブジェクトID,
+          size: {
+            width: { magnitude: 幅ポイント, unit: 'PT' },
+            height: { magnitude: 高さポイント, unit: 'PT' }
+          }
+        }
+      },
+      // 位置も再設定
+      {
+        updatePageElementTransform: {
+          objectId: オブジェクトID,
+          applyMode: 'ABSOLUTE',
+          transform: {
+            scaleX: 1,
+            scaleY: 1,
+            translateX: 左ポイント,
+            translateY: 上ポイント,
+            unit: 'PT'
+          }
+        }
       }
     ];
 
@@ -447,6 +483,29 @@ function テキストを追加(スライド, テキスト, オプション) {
         }
       });
     }
+
+    // 全スタイル設定後に、再度autofitを無効化してサイズを完全固定
+    requests.push({
+      updateShapeProperties: {
+        objectId: オブジェクトID,
+        fields: 'autofit',
+        shapeProperties: {
+          autofit: {
+            autofitType: 'NONE'
+          }
+        }
+      }
+    });
+
+    requests.push({
+      updatePageElementSize: {
+        objectId: オブジェクトID,
+        size: {
+          width: { magnitude: 幅ポイント, unit: 'PT' },
+          height: { magnitude: 高さポイント, unit: 'PT' }
+        }
+      }
+    });
 
     Slides.Presentations.batchUpdate({ requests: requests }, プレゼンID);
 
