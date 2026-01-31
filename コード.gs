@@ -357,184 +357,62 @@ function ポイントをインチに変換(ポイント) {
 
 /**
  * SlidesApp でテキストボックスを作成
- * Slides APIを併用してautofitを無効化
+ * 改行なし、サイズ固定アプローチ
  */
 function テキストを追加(スライド, テキスト, オプション) {
-  const プレゼンID = 現在のプレゼンID;
-  const スライドID = スライド.getObjectId();
+  const 幅インチ = ポイントをインチに変換(オプション.幅);
+  const 高さインチ = ポイントをインチに変換(オプション.高さ);
+  const 左インチ = ポイントをインチに変換(オプション.左位置);
+  const 上インチ = ポイントをインチに変換(オプション.上位置);
 
-  // ユニークなオブジェクトIDを生成
-  const オブジェクトID = 'textbox_' + new Date().getTime() + '_' + Math.floor(Math.random() * 10000);
+  // 改行を空白に置換（縦書き防止）
+  const クリーンテキスト = テキスト.replace(/\n/g, ' ');
 
-  // ポイント単位の値
-  const 幅ポイント = オプション.幅;
-  const 高さポイント = オプション.高さ;
-  const 左ポイント = オプション.左位置;
-  const 上ポイント = オプション.上位置;
+  // テキストボックスを作成（空で作成）
+  const テキストボックス = スライド.insertTextBox(
+    '',
+    左インチ,
+    上インチ,
+    幅インチ,
+    高さインチ
+  );
 
-  // Slides APIでテキストボックスを作成（autofitを最初から無効化）
-  try {
-    const requests = [
-      // ステップ1: テキストボックス作成
-      {
-        createShape: {
-          objectId: オブジェクトID,
-          shapeType: 'TEXT_BOX',
-          elementProperties: {
-            pageObjectId: スライドID,
-            size: {
-              width: { magnitude: 幅ポイント, unit: 'PT' },
-              height: { magnitude: 高さポイント, unit: 'PT' }
-            },
-            transform: {
-              scaleX: 1,
-              scaleY: 1,
-              translateX: 左ポイント,
-              translateY: 上ポイント,
-              unit: 'PT'
-            }
-          }
-        }
-      },
-      // ステップ2: テキスト挿入前にautofitを無効化（重要！）
-      {
-        updateShapeProperties: {
-          objectId: オブジェクトID,
-          fields: 'autofit',
-          shapeProperties: {
-            autofit: {
-              autofitType: 'NONE'
-            }
-          }
-        }
-      },
-      // ステップ3: サイズを固定
-      {
-        updatePageElementSize: {
-          objectId: オブジェクトID,
-          size: {
-            width: { magnitude: 幅ポイント, unit: 'PT' },
-            height: { magnitude: 高さポイント, unit: 'PT' }
-          }
-        }
-      },
-      // ステップ4: テキスト挿入
-      {
-        insertText: {
-          objectId: オブジェクトID,
-          text: テキスト
-        }
-      }
-    ];
+  // テキスト範囲を取得してテキストを設定
+  const テキスト範囲 = テキストボックス.getText();
+  テキスト範囲.setText(クリーンテキスト);
 
-    // スタイル設定
-    if (オプション.フォントサイズ) {
-      requests.push({
-        updateTextStyle: {
-          objectId: オブジェクトID,
-          fields: 'fontSize',
-          style: {
-            fontSize: { magnitude: オプション.フォントサイズ, unit: 'PT' }
-          },
-          textRange: { type: 'ALL' }
-        }
-      });
-    }
-
-    if (オプション.太字) {
-      requests.push({
-        updateTextStyle: {
-          objectId: オブジェクトID,
-          fields: 'bold',
-          style: { bold: true },
-          textRange: { type: 'ALL' }
-        }
-      });
-    }
-
-    if (オプション.色) {
-      requests.push({
-        updateTextStyle: {
-          objectId: オブジェクトID,
-          fields: 'foregroundColor',
-          style: {
-            foregroundColor: {
-              opaqueColor: { rgbColor: hexToRgb(オプション.色) }
-            }
-          },
-          textRange: { type: 'ALL' }
-        }
-      });
-    }
-
-    if (オプション.配置) {
-      let alignment = 'START';
-      if (オプション.配置 === '中央') alignment = 'CENTER';
-      else if (オプション.配置 === '右') alignment = 'END';
-
-      requests.push({
-        updateParagraphStyle: {
-          objectId: オブジェクトID,
-          fields: 'alignment',
-          style: { alignment: alignment },
-          textRange: { type: 'ALL' }
-        }
-      });
-    }
-
-    // 全スタイル設定後に、再度autofitを無効化してサイズを完全固定
-    requests.push({
-      updateShapeProperties: {
-        objectId: オブジェクトID,
-        fields: 'autofit',
-        shapeProperties: {
-          autofit: {
-            autofitType: 'NONE'
-          }
-        }
-      }
-    });
-
-    requests.push({
-      updatePageElementSize: {
-        objectId: オブジェクトID,
-        size: {
-          width: { magnitude: 幅ポイント, unit: 'PT' },
-          height: { magnitude: 高さポイント, unit: 'PT' }
-        }
-      }
-    });
-
-    Slides.Presentations.batchUpdate({ requests: requests }, プレゼンID);
-
-    // SlidesAppで作成されたオブジェクトを取得
-    const テキストボックス = スライド.getShapes().find(s => s.getObjectId() === オブジェクトID);
-    return テキストボックス;
-
-  } catch (e) {
-    Logger.log('Slides API エラー: ' + e.toString());
-    // フォールバック: SlidesAppで作成
-    const テキストボックス = スライド.insertTextBox(
-      テキスト,
-      ポイントをインチに変換(左ポイント),
-      ポイントをインチに変換(上ポイント),
-      ポイントをインチに変換(幅ポイント),
-      ポイントをインチに変換(高さポイント)
-    );
-    return テキストボックス;
+  // フォントサイズを先に設定（重要）
+  if (オプション.フォントサイズ) {
+    テキスト範囲.getTextStyle().setFontSize(オプション.フォントサイズ);
   }
-}
 
-/**
- * HEX色をRGBオブジェクトに変換
- */
-function hexToRgb(hex) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? {
-    red: parseInt(result[1], 16) / 255,
-    green: parseInt(result[2], 16) / 255,
-    blue: parseInt(result[3], 16) / 255
-  } : { red: 0, green: 0, blue: 0 };
+  // 太字
+  if (オプション.太字) {
+    テキスト範囲.getTextStyle().setBold(true);
+  }
+
+  // 色
+  if (オプション.色) {
+    テキスト範囲.getTextStyle().setForegroundColor(オプション.色);
+  }
+
+  // 配置
+  const 段落スタイル = テキスト範囲.getParagraphStyle();
+  if (オプション.配置 === '中央') {
+    段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
+  } else if (オプション.配置 === '右') {
+    段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.END);
+  } else {
+    段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.START);
+  }
+
+  // 最後にサイズを完全に固定
+  テキストボックス.setWidth(幅インチ);
+  テキストボックス.setHeight(高さインチ);
+  テキストボックス.setLeft(左インチ);
+  テキストボックス.setTop(上インチ);
+
+  return テキストボックス;
 }
 
 /**
