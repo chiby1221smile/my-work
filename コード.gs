@@ -375,6 +375,7 @@ function テキストを追加(スライド, テキスト, オプション) {
   // Slides APIでテキストボックスを作成（autofitを最初から無効化）
   try {
     const requests = [
+      // ステップ1: テキストボックス作成
       {
         createShape: {
           objectId: オブジェクトID,
@@ -395,13 +396,7 @@ function テキストを追加(スライド, テキスト, オプション) {
           }
         }
       },
-      {
-        insertText: {
-          objectId: オブジェクトID,
-          text: テキスト
-        }
-      },
-      // CRITICAL: autofitを無効化してサイズを固定
+      // ステップ2: テキスト挿入前にautofitを無効化（重要！）
       {
         updateShapeProperties: {
           objectId: オブジェクトID,
@@ -413,7 +408,7 @@ function テキストを追加(スライド, テキスト, オプション) {
           }
         }
       },
-      // サイズを再度明示的に設定
+      // ステップ3: サイズを固定
       {
         updatePageElementSize: {
           objectId: オブジェクトID,
@@ -423,18 +418,11 @@ function テキストを追加(スライド, テキスト, オプション) {
           }
         }
       },
-      // 位置も再設定
+      // ステップ4: テキスト挿入
       {
-        updatePageElementTransform: {
+        insertText: {
           objectId: オブジェクトID,
-          applyMode: 'ABSOLUTE',
-          transform: {
-            scaleX: 1,
-            scaleY: 1,
-            translateX: 左ポイント,
-            translateY: 上ポイント,
-            unit: 'PT'
-          }
+          text: テキスト
         }
       }
     ];
