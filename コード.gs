@@ -181,6 +181,15 @@ function 戦略資料を自動生成_分割() {
 
     PropertiesService.getUserProperties().setProperty('最新プレゼンURL', プレゼンURL);
 
+    // スプレッドシートのG列にURLを書き込む
+    try {
+      const シート = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+      シート.getRange(クライアントデータ.行番号, 7).setValue(プレゼンURL);
+      Logger.log(`G${クライアントデータ.行番号}にURLを書き込みました`);
+    } catch (e) {
+      Logger.log('URL書き込みエラー（処理は続行）: ' + e.toString());
+    }
+
     Logger.log('========================================');
     Logger.log('戦略資料生成完了');
     Logger.log('URL: ' + プレゼンURL);
@@ -192,6 +201,7 @@ function 戦略資料を自動生成_分割() {
       `クライアント: ${クライアントデータ.起案者名}\n` +
       `目標金額: ¥${クライアントデータ.目標金額.toLocaleString()}\n` +
       `総スライド数: ${総スライド数}ページ\n\n` +
+      `スプレッドシートのG列にURLを記録しました。\n\n` +
       `以下のURLをコピーして開いてください:\n${プレゼンURL}`
     );
 
