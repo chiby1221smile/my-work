@@ -341,7 +341,7 @@ function ポイントをインチに変換(ポイント) {
  * 横書き（LEFT_TO_RIGHT）を強制
  */
 function テキストを追加(スライド, テキスト, オプション) {
-  const プレゼンID = スライド.getPresentation().getId();
+  const プレゼンID = スライド.getParent().getId();
   const スライドID = スライド.getObjectId();
 
   const テキストボックスID = 'textbox_' + new Date().getTime() + '_' + Math.random().toString(36).substr(2, 9);
