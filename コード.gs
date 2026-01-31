@@ -346,107 +346,48 @@ function ポイントをインチに変換(ポイント) {
 }
 
 /**
- * Slides API batchUpdate でテキストボックスを作成
- * 横書き（LEFT_TO_RIGHT）を強制
+ * SlidesApp でテキストボックスを作成
+ * シンプルで確実な方法
  */
 function テキストを追加(スライド, テキスト, オプション) {
-  const プレゼンID = 現在のプレゼンID;
+  // テキストボックスを挿入
+  const テキストボックス = スライド.insertTextBox(
+    テキスト,
+    ポイントをインチに変換(オプション.左位置),
+    ポイントをインチに変換(オプション.上位置),
+    ポイントをインチに変換(オプション.幅),
+    ポイントをインチに変換(オプション.高さ)
+  );
 
-  // Slides APIを使って正しいスライドIDを取得
-  const プレゼン情報 = Slides.Presentations.get(プレゼンID);
-  const スライド一覧 = プレゼン情報.slides;
-  const 対象スライドインデックス = スライド.getPageIndex();
-  const スライドID = スライド一覧[対象スライドインデックス].objectId;
+  // テキスト範囲を取得
+  const テキスト範囲 = テキストボックス.getText();
 
-  const テキストボックスID = 'textbox_' + new Date().getTime() + '_' + Math.random().toString(36).substr(2, 9);
-
-  const 左位置PT = オプション.左位置;
-  const 上位置PT = オプション.上位置;
-  const 幅PT = オプション.幅;
-  const 高さPT = オプション.高さ;
-
-  let 配置 = 'START';
-  if (オプション.配置 === '中央') {
-    配置 = 'CENTER';
-  } else if (オプション.配置 === '右') {
-    配置 = 'END';
+  // フォントサイズを設定
+  if (オプション.フォントサイズ) {
+    テキスト範囲.getTextStyle().setFontSize(オプション.フォントサイズ);
   }
 
-  let 色RGB = { red: 0.2, green: 0.2, blue: 0.2 };
+  // 太字を設定
+  if (オプション.太字) {
+    テキスト範囲.getTextStyle().setBold(true);
+  }
+
+  // 色を設定
   if (オプション.色) {
-    const 色16進 = オプション.色.replace('#', '');
-    色RGB = {
-      red: parseInt(色16進.substr(0, 2), 16) / 255,
-      green: parseInt(色16進.substr(2, 2), 16) / 255,
-      blue: parseInt(色16進.substr(4, 2), 16) / 255
-    };
+    テキスト範囲.getTextStyle().setForegroundColor(オプション.色);
   }
 
-  const リクエスト = [
-    {
-      createShape: {
-        objectId: テキストボックスID,
-        shapeType: 'TEXT_BOX',
-        elementProperties: {
-          pageObjectId: スライドID,
-          size: {
-            width: { magnitude: 幅PT, unit: 'PT' },
-            height: { magnitude: 高さPT, unit: 'PT' }
-          },
-          transform: {
-            scaleX: 1,
-            scaleY: 1,
-            translateX: 左位置PT,
-            translateY: 上位置PT,
-            unit: 'PT'
-          }
-        }
-      }
-    },
-    {
-      insertText: {
-        objectId: テキストボックスID,
-        text: テキスト,
-        insertionIndex: 0
-      }
-    },
-    {
-      updateTextStyle: {
-        objectId: テキストボックスID,
-        style: {
-          fontSize: {
-            magnitude: オプション.フォントサイズ || 12,
-            unit: 'PT'
-          },
-          foregroundColor: {
-            opaqueColor: {
-              rgbColor: 色RGB
-            }
-          },
-          bold: オプション.太字 || false
-        },
-        fields: 'fontSize,foregroundColor,bold'
-      }
-    },
-    {
-      updateParagraphStyle: {
-        objectId: テキストボックスID,
-        style: {
-          direction: 'LEFT_TO_RIGHT',
-          alignment: 配置
-        },
-        fields: 'direction,alignment'
-      }
-    }
-  ];
-
-  try {
-    Slides.Presentations.batchUpdate({ requests: リクエスト }, プレゼンID);
-    return テキストボックスID;
-  } catch (e) {
-    Logger.log('テキスト追加エラー: ' + e.toString());
-    throw e;
+  // 配置を設定
+  const 段落スタイル = テキスト範囲.getParagraphStyle();
+  if (オプション.配置 === '中央') {
+    段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
+  } else if (オプション.配置 === '右') {
+    段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.END);
+  } else {
+    段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.START);
   }
+
+  return テキストボックス;
 }
 
 /**
