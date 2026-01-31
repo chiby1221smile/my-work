@@ -351,7 +351,12 @@ function ポイントをインチに変換(ポイント) {
  */
 function テキストを追加(スライド, テキスト, オプション) {
   const プレゼンID = 現在のプレゼンID;
-  const スライドID = スライド.getObjectId();
+
+  // Slides APIを使って正しいスライドIDを取得
+  const プレゼン情報 = Slides.Presentations.get(プレゼンID);
+  const スライド一覧 = プレゼン情報.slides;
+  const 対象スライドインデックス = スライド.getPageIndex();
+  const スライドID = スライド一覧[対象スライドインデックス].objectId;
 
   const テキストボックスID = 'textbox_' + new Date().getTime() + '_' + Math.random().toString(36).substr(2, 9);
 
