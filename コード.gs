@@ -413,80 +413,147 @@ function ポイントをインチに変換(ポイント) {
 }
 
 /**
- * SlidesApp でテキストボックスを作成
- * テキスト入れて即サイズ固定アプローチ
+ * Slides APIでテキストボックスを作成（autofit制御のため）
  */
 function テキストを追加(スライド, テキスト, オプション) {
-  const 幅インチ = ポイントをインチに変換(オプション.幅);
-  const 高さインチ = ポイントをインチに変換(オプション.高さ);
-  const 左インチ = ポイントをインチに変換(オプション.左位置);
-  const 上インチ = ポイントをインチに変換(オプション.上位置);
+  const プレゼンID = 現在のプレゼンID;
+  const スライドID = スライド.getObjectId();
+
+  // ユニークなIDを生成
+  const オブジェクトID = 'txt_' + new Date().getTime() + '_' + Math.floor(Math.random() * 100000);
 
   // 改行を空白に置換
   const クリーンテキスト = テキスト.replace(/\n/g, ' ');
 
-  // テキストボックスを作成
-  const テキストボックス = スライド.insertTextBox(
-    クリーンテキスト,
-    左インチ,
-    上インチ,
-    幅インチ,
-    高さインチ
-  );
+  // Slides APIリクエストを構築
+  const requests = [];
 
-  // テキストボックスのIDを取得
-  const テキストボックスID = テキストボックス.getObjectId();
-  const プレゼンID = 現在のプレゼンID;
-
-  // 重要：Slides APIで「サイズを変更しない」設定を適用
-  try {
-    Slides.Presentations.batchUpdate({
-      requests: [{
-        updateShapeProperties: {
-          objectId: テキストボックスID,
-          fields: 'shapeProperties.autofit',
-          shapeProperties: {
-            autofit: {
-              autofitType: 'NONE'  // 「サイズを変更しない」
-            }
-          }
+  // 1. テキストボックス作成（空）
+  requests.push({
+    createShape: {
+      objectId: オブジェクトID,
+      shapeType: 'TEXT_BOX',
+      elementProperties: {
+        pageObjectId: スライドID,
+        size: {
+          width: { magnitude: オプション.幅, unit: 'PT' },
+          height: { magnitude: オプション.高さ, unit: 'PT' }
+        },
+        transform: {
+          scaleX: 1,
+          scaleY: 1,
+          translateX: オプション.左位置,
+          translateY: オプション.上位置,
+          unit: 'PT'
         }
-      }]
-    }, プレゼンID);
-    Logger.log(`Autofit NONE設定完了: ${テキストボックスID}`);
-  } catch (e) {
-    Logger.log(`Autofit設定エラー: ${e.toString()}`);
-  }
+      }
+    }
+  });
 
-  // テキスト範囲を取得
-  const テキスト範囲 = テキストボックス.getText();
+  // 2. Autofit設定（テキスト挿入前に！）
+  requests.push({
+    updateShapeProperties: {
+      objectId: オブジェクトID,
+      fields: 'shapeProperties.autofit',
+      shapeProperties: {
+        autofit: {
+          autofitType: 'NONE'  // サイズを変更しない
+        }
+      }
+    }
+  });
 
-  // フォントサイズを設定
+  // 3. テキスト挿入
+  requests.push({
+    insertText: {
+      objectId: オブジェクトID,
+      text: クリーンテキスト
+    }
+  });
+
+  // 4. フォントサイズ
   if (オプション.フォントサイズ) {
-    テキスト範囲.getTextStyle().setFontSize(オプション.フォントサイズ);
+    requests.push({
+      updateTextStyle: {
+        objectId: オブジェクトID,
+        fields: 'fontSize',
+        style: {
+          fontSize: { magnitude: オプション.フォントサイズ, unit: 'PT' }
+        },
+        textRange: { type: 'ALL' }
+      }
+    });
   }
 
-  // 太字
+  // 5. 太字
   if (オプション.太字) {
-    テキスト範囲.getTextStyle().setBold(true);
+    requests.push({
+      updateTextStyle: {
+        objectId: オブジェクトID,
+        fields: 'bold',
+        style: { bold: true },
+        textRange: { type: 'ALL' }
+      }
+    });
   }
 
-  // 色
+  // 6. 色
   if (オプション.色) {
-    テキスト範囲.getTextStyle().setForegroundColor(オプション.色);
+    const rgb = hexToRgb(オプション.色);
+    requests.push({
+      updateTextStyle: {
+        objectId: オブジェクトID,
+        fields: 'foregroundColor',
+        style: {
+          foregroundColor: {
+            opaqueColor: { rgbColor: rgb }
+          }
+        },
+        textRange: { type: 'ALL' }
+      }
+    });
   }
 
-  // 配置
-  const 段落スタイル = テキスト範囲.getParagraphStyle();
-  if (オプション.配置 === '中央') {
-    段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
-  } else if (オプション.配置 === '右') {
-    段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.END);
-  } else {
-    段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.START);
+  // 7. 配置
+  if (オプション.配置) {
+    let alignment = 'START';
+    if (オプション.配置 === '中央') alignment = 'CENTER';
+    else if (オプション.配置 === '右') alignment = 'END';
+
+    requests.push({
+      updateParagraphStyle: {
+        objectId: オブジェクトID,
+        fields: 'alignment',
+        style: { alignment: alignment },
+        textRange: { type: 'ALL' }
+      }
+    });
   }
 
+  // すべてのリクエストを一度に実行
+  try {
+    Slides.Presentations.batchUpdate({ requests: requests }, プレゼンID);
+    Logger.log(`テキストボックス作成成功: ${オブジェクトID}`);
+  } catch (e) {
+    Logger.log(`Slides APIエラー: ${e.toString()}`);
+    throw e;
+  }
+
+  // 作成されたテキストボックスを取得して返す
+  const テキストボックス = スライド.getShapes().find(s => s.getObjectId() === オブジェクトID);
   return テキストボックス;
+}
+
+/**
+ * HEX色をRGBに変換
+ */
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    red: parseInt(result[1], 16) / 255,
+    green: parseInt(result[2], 16) / 255,
+    blue: parseInt(result[3], 16) / 255
+  } : { red: 1, green: 1, blue: 1 };
 }
 
 /**
