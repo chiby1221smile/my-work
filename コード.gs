@@ -77,6 +77,8 @@ const フォントサイズ = {
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('📊 CAMPFIRE戦略')
+    .addItem('🧪 テスト（1枚だけ生成）', 'テスト生成')
+    .addSeparator()
     .addItem('🚀 戦略資料を自動生成（分割版）', '戦略資料を自動生成_分割')
     .addItem('📂 最新資料のURL表示', '最新資料のURL表示')
     .addSeparator()
@@ -116,6 +118,61 @@ function テンプレート行を追加() {
   ]]);
 
   SpreadsheetApp.getUi().alert('テンプレート行を追加しました。\n内容を編集してご利用ください。');
+}
+
+// ========================================
+// テスト用関数（1枚だけ生成）
+// ========================================
+
+function テスト生成() {
+  try {
+    Logger.log('========================================');
+    Logger.log('テスト生成開始（章タイトルスライド1枚のみ）');
+    Logger.log('========================================');
+
+    // テスト用プレゼンテーション作成
+    const プレゼン名 = 'テスト_章タイトルスライド';
+    const プレゼン = SlidesApp.create(プレゼン名);
+    現在のプレゼンID = プレゼン.getId();
+
+    // 16:9サイズ設定
+    try {
+      Slides.Presentations.patch({
+        pageSize: {
+          width: { magnitude: ページサイズ.幅, unit: 'PT' },
+          height: { magnitude: ページサイズ.高さ, unit: 'PT' }
+        }
+      }, プレゼン.getId());
+      Logger.log('ページサイズ設定完了');
+    } catch (e) {
+      Logger.log('ページサイズ設定エラー: ' + e.toString());
+    }
+
+    // 最初のスライドを削除
+    const スライド一覧 = プレゼン.getSlides();
+    if (スライド一覧.length > 0) {
+      スライド一覧[0].remove();
+    }
+
+    // 章タイトルスライドを1枚だけ作成
+    章タイトルスライドを作成(プレゼン, '09', 'チェックリスト・まとめ', '成功への最終確認');
+
+    const プレゼンURL = プレゼン.getUrl();
+    Logger.log('========================================');
+    Logger.log('テスト生成完了');
+    Logger.log('URL: ' + プレゼンURL);
+    Logger.log('========================================');
+
+    SpreadsheetApp.getUi().alert('✅ テスト完了！\n\n章タイトルスライド1枚を生成しました。\n\n' + プレゼンURL);
+
+    return プレゼンURL;
+
+  } catch (エラー) {
+    Logger.log('エラー発生: ' + エラー.toString());
+    Logger.log('スタックトレース: ' + エラー.stack);
+    SpreadsheetApp.getUi().alert('エラー', 'エラーが発生しました:\n\n' + エラー.toString(), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw エラー;
+  }
 }
 
 // ========================================
@@ -368,7 +425,7 @@ function テキストを追加(スライド, テキスト, オプション) {
   // 改行を空白に置換
   const クリーンテキスト = テキスト.replace(/\n/g, ' ');
 
-  // テキストを入れた状態でボックスを作成
+  // テキストボックスを作成
   const テキストボックス = スライド.insertTextBox(
     クリーンテキスト,
     左インチ,
@@ -377,14 +434,29 @@ function テキストを追加(スライド, テキスト, オプション) {
     高さインチ
   );
 
-  // 作成直後に即座にサイズを固定（自動調整される前に）
-  テキストボックス.setWidth(幅インチ);
-  テキストボックス.setHeight(高さインチ);
-  テキストボックス.setLeft(左インチ);
-  テキストボックス.setTop(上インチ);
+  // テキストボックスのIDを取得
+  const テキストボックスID = テキストボックス.getObjectId();
+  const プレゼンID = 現在のプレゼンID;
 
-  // Logger でサイズを確認（デバッグ用）
-  Logger.log(`テキスト: "${クリーンテキスト.substring(0, 20)}..." 幅=${幅インチ}インチ (${オプション.幅}pt)`);
+  // 重要：Slides APIで「サイズを変更しない」設定を適用
+  try {
+    Slides.Presentations.batchUpdate({
+      requests: [{
+        updateShapeProperties: {
+          objectId: テキストボックスID,
+          fields: 'shapeProperties.autofit',
+          shapeProperties: {
+            autofit: {
+              autofitType: 'NONE'  // 「サイズを変更しない」
+            }
+          }
+        }
+      }]
+    }, プレゼンID);
+    Logger.log(`Autofit NONE設定完了: ${テキストボックスID}`);
+  } catch (e) {
+    Logger.log(`Autofit設定エラー: ${e.toString()}`);
+  }
 
   // テキスト範囲を取得
   const テキスト範囲 = テキストボックス.getText();
@@ -413,15 +485,6 @@ function テキストを追加(スライド, テキスト, オプション) {
   } else {
     段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.START);
   }
-
-  // 全スタイル設定後、再度サイズを強制固定
-  テキストボックス.setWidth(幅インチ);
-  テキストボックス.setHeight(高さインチ);
-  テキストボックス.setLeft(左インチ);
-  テキストボックス.setTop(上インチ);
-
-  // 実際のサイズを確認（デバッグ用）
-  Logger.log(`最終サイズ: 幅=${テキストボックス.getWidth()}インチ`);
 
   return テキストボックス;
 }
