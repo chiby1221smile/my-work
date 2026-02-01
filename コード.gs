@@ -418,27 +418,9 @@ function ポイントをインチに変換(ポイント) {
 function テキストを追加(スライド, テキスト, オプション) {
   const プレゼンID = 現在のプレゼンID;
 
-  // SlidesAppのスライドからページインデックスを取得
-  const プレゼン = SlidesApp.openById(プレゼンID);
-  const 全スライド = プレゼン.getSlides();
-  const ページインデックス = 全スライド.indexOf(スライド);
-
-  // Slides APIでスライドIDを取得
-  let スライドID;
-  try {
-    const プレゼン情報 = Slides.Presentations.get(プレゼンID);
-    const スライド一覧 = プレゼン情報.slides;
-
-    if (ページインデックス >= 0 && ページインデックス < スライド一覧.length) {
-      スライドID = スライド一覧[ページインデックス].objectId;
-      Logger.log(`ページ${ページインデックス}のSlides API ID: ${スライドID}`);
-    } else {
-      throw new Error(`ページインデックス${ページインデックス}が範囲外`);
-    }
-  } catch (e) {
-    Logger.log(`スライドID取得エラー: ${e.toString()}`);
-    throw e;
-  }
+  // SlidesAppのスライドから直接ObjectIDを取得
+  const スライドID = スライド.getObjectId();
+  Logger.log(`スライドID: ${スライドID}`);
 
   // ユニークなIDを生成
   const オブジェクトID = 'txt_' + new Date().getTime() + '_' + Math.floor(Math.random() * 100000);
