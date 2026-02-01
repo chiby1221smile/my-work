@@ -453,20 +453,7 @@ function テキストを追加(スライド, テキスト, オプション) {
     }
   });
 
-  // 2. Autofit設定（テキスト挿入前に！）
-  requests.push({
-    updateShapeProperties: {
-      objectId: オブジェクトID,
-      fields: 'shapeProperties.autofit',
-      shapeProperties: {
-        autofit: {
-          autofitType: 'NONE'  // サイズを変更しない
-        }
-      }
-    }
-  });
-
-  // 3. テキスト挿入
+  // 2. テキスト挿入
   requests.push({
     insertText: {
       objectId: オブジェクトID,
@@ -474,7 +461,7 @@ function テキストを追加(スライド, テキスト, オプション) {
     }
   });
 
-  // 4. フォントサイズ
+  // 3. フォントサイズ
   if (オプション.フォントサイズ) {
     requests.push({
       updateTextStyle: {
@@ -488,7 +475,7 @@ function テキストを追加(スライド, テキスト, オプション) {
     });
   }
 
-  // 5. 太字
+  // 4. 太字
   if (オプション.太字) {
     requests.push({
       updateTextStyle: {
@@ -500,7 +487,7 @@ function テキストを追加(スライド, テキスト, オプション) {
     });
   }
 
-  // 6. 色
+  // 5. 色
   if (オプション.色) {
     const rgb = hexToRgb(オプション.色);
     requests.push({
