@@ -416,132 +416,51 @@ function ポイントをインチに変換(ポイント) {
  * Slides APIでテキストボックスを作成（autofit制御のため）
  */
 function テキストを追加(スライド, テキスト, オプション) {
-  const プレゼンID = 現在のプレゼンID;
+  // SlidesApp だけを使って実装（同期問題なし）
 
-  // Slides APIとの同期を待つ（重要！）
-  Utilities.sleep(200);
+  // テキストボックスを作成
+  const テキストボックス = スライド.insertShape(
+    SlidesApp.ShapeType.TEXT_BOX,
+    オプション.左位置,
+    オプション.上位置,
+    オプション.幅,
+    オプション.高さ
+  );
 
-  // SlidesAppでスライドのインデックスを取得
-  const プレゼン = SlidesApp.openById(プレゼンID);
-  const 全スライド = プレゼン.getSlides();
-  const ページインデックス = 全スライド.indexOf(スライド);
+  // テキストを設定
+  const テキスト範囲 = テキストボックス.getText();
+  テキスト範囲.setText(テキスト);
 
-  // Slides APIで同じインデックスのスライドIDを取得
-  const プレゼン情報 = Slides.Presentations.get(プレゼンID);
-  const スライド一覧 = プレゼン情報.slides;
-  const スライドID = スライド一覧[ページインデックス].objectId;
+  // スタイルを適用
+  const スタイル = テキスト範囲.getTextStyle();
 
-  Logger.log(`スライドID: ${スライドID} (インデックス: ${ページインデックス})`);
-
-  // ユニークなIDを生成
-  const オブジェクトID = 'txt_' + new Date().getTime() + '_' + Math.floor(Math.random() * 100000);
-
-  // 改行を空白に置換
-  const クリーンテキスト = テキスト.replace(/\n/g, ' ');
-
-  // Slides APIリクエストを構築
-  const requests = [];
-
-  // 1. テキストボックス作成（空）
-  requests.push({
-    createShape: {
-      objectId: オブジェクトID,
-      shapeType: 'TEXT_BOX',
-      elementProperties: {
-        pageObjectId: スライドID,
-        size: {
-          width: { magnitude: オプション.幅, unit: 'PT' },
-          height: { magnitude: オプション.高さ, unit: 'PT' }
-        },
-        transform: {
-          scaleX: 1,
-          scaleY: 1,
-          translateX: オプション.左位置,
-          translateY: オプション.上位置,
-          unit: 'PT'
-        }
-      }
-    }
-  });
-
-  // 2. テキスト挿入
-  requests.push({
-    insertText: {
-      objectId: オブジェクトID,
-      text: クリーンテキスト
-    }
-  });
-
-  // 3. フォントサイズ
+  // フォントサイズ
   if (オプション.フォントサイズ) {
-    requests.push({
-      updateTextStyle: {
-        objectId: オブジェクトID,
-        fields: 'fontSize',
-        style: {
-          fontSize: { magnitude: オプション.フォントサイズ, unit: 'PT' }
-        },
-        textRange: { type: 'ALL' }
-      }
-    });
+    スタイル.setFontSize(オプション.フォントサイズ);
   }
 
-  // 4. 太字
+  // 太字
   if (オプション.太字) {
-    requests.push({
-      updateTextStyle: {
-        objectId: オブジェクトID,
-        fields: 'bold',
-        style: { bold: true },
-        textRange: { type: 'ALL' }
-      }
-    });
+    スタイル.setBold(true);
   }
 
-  // 5. 色
+  // 色
   if (オプション.色) {
-    const rgb = hexToRgb(オプション.色);
-    requests.push({
-      updateTextStyle: {
-        objectId: オブジェクトID,
-        fields: 'foregroundColor',
-        style: {
-          foregroundColor: {
-            opaqueColor: { rgbColor: rgb }
-          }
-        },
-        textRange: { type: 'ALL' }
-      }
-    });
+    スタイル.setForegroundColor(オプション.色);
   }
 
-  // 7. 配置
+  // 配置
   if (オプション.配置) {
-    let alignment = 'START';
-    if (オプション.配置 === '中央') alignment = 'CENTER';
-    else if (オプション.配置 === '右') alignment = 'END';
-
-    requests.push({
-      updateParagraphStyle: {
-        objectId: オブジェクトID,
-        fields: 'alignment',
-        style: { alignment: alignment },
-        textRange: { type: 'ALL' }
-      }
-    });
+    const 段落スタイル = テキスト範囲.getParagraphStyle();
+    if (オプション.配置 === '中央') {
+      段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
+    } else if (オプション.配置 === '右') {
+      段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.END);
+    } else {
+      段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.START);
+    }
   }
 
-  // すべてのリクエストを一度に実行
-  try {
-    Slides.Presentations.batchUpdate({ requests: requests }, プレゼンID);
-    Logger.log(`テキストボックス作成成功: ${オブジェクトID}`);
-  } catch (e) {
-    Logger.log(`Slides APIエラー: ${e.toString()}`);
-    throw e;
-  }
-
-  // 作成されたテキストボックスを取得して返す
-  const テキストボックス = スライド.getShapes().find(s => s.getObjectId() === オブジェクトID);
   return テキストボックス;
 }
 
