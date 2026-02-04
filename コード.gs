@@ -4,7 +4,7 @@
  * ========================================
  *
  * Google Slidesで戦略資料を自動生成します
- * 9:16縦サイズ（540 x 960ポイント）
+ * 16:9横サイズ（960 x 540ポイント）
  *
  * 【対応プロジェクト】
  * - 出版プロジェクト
@@ -47,15 +47,15 @@ const 色設定 = {
 };
 
 const ページサイズ = {
-  幅: 540,    // 9:16 縦（縦向きスライド）
-  高さ: 960   // 9:16 縦
+  幅: 960,    // 16:9 横（標準プレゼンサイズ）
+  高さ: 540   // 16:9 横
 };
 
 const 余白 = {
-  上: 50,
-  下: 50,
-  左: 40,
-  右: 40
+  上: 40,
+  下: 40,
+  左: 60,
+  右: 60
 };
 
 const コンテンツ幅 = ページサイズ.幅 - 余白.左 - 余白.右;
@@ -148,22 +148,7 @@ function テスト生成() {
     現在のプレゼンID = プレゼン.getId();
 
     Logger.log('プレゼンテーションID: ' + 現在のプレゼンID);
-
-    // 9:16 縦向きサイズ設定（重要！）
-    try {
-      Logger.log(`ページサイズ設定: 幅=${ページサイズ.幅}, 高さ=${ページサイズ.高さ}`);
-      Slides.Presentations.patch({
-        pageSize: {
-          width: { magnitude: ページサイズ.幅, unit: 'PT' },
-          height: { magnitude: ページサイズ.高さ, unit: 'PT' }
-        }
-      }, プレゼン.getId(), { fields: 'pageSize' });
-      Logger.log('ページサイズ設定完了');
-    } catch (e) {
-      Logger.log('ページサイズ設定エラー: ' + e.toString());
-      SpreadsheetApp.getUi().alert('エラー', 'ページサイズ設定に失敗しました:\n' + e.toString(), SpreadsheetApp.getUi().ButtonSet.OK);
-      return;
-    }
+    Logger.log('Google Slidesのデフォルトサイズ (16:9) を使用');
 
     // 最初のスライドを削除
     const スライド一覧 = プレゼン.getSlides();
