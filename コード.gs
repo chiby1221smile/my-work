@@ -127,14 +127,14 @@ function テンプレート行を追加() {
 function テスト生成() {
   try {
     Logger.log('========================================');
-    Logger.log('テスト生成開始（表紙から10枚）');
+    Logger.log('テスト生成開始（縦向き4枚）');
     Logger.log('========================================');
 
     // テスト用クライアントデータ
     const テストデータ = {
       起案者名: 'テストクライアント',
       プロジェクト名: 'テストプロジェクト',
-      目標金額: 1000000,
+      目標金額: 500000,
       公開日: '2026年3月1日',
       終了日: '2026年3月31日',
       URL一覧: 'https://twitter.com/test,https://instagram.com/test,https://facebook.com/test'
@@ -143,21 +143,26 @@ function テスト生成() {
     const SNS情報 = SNSのURLを解析(テストデータ.URL一覧);
 
     // テスト用プレゼンテーション作成
-    const プレゼン名 = 'テスト_表紙から10枚_デザイン確認';
+    const プレゼン名 = 'テスト_縦向きスライド_' + new Date().getTime();
     const プレゼン = SlidesApp.create(プレゼン名);
     現在のプレゼンID = プレゼン.getId();
 
-    // 16:9サイズ設定
+    Logger.log('プレゼンテーションID: ' + 現在のプレゼンID);
+
+    // 9:16 縦向きサイズ設定（重要！）
     try {
+      Logger.log(`ページサイズ設定: 幅=${ページサイズ.幅}, 高さ=${ページサイズ.高さ}`);
       Slides.Presentations.patch({
         pageSize: {
           width: { magnitude: ページサイズ.幅, unit: 'PT' },
           height: { magnitude: ページサイズ.高さ, unit: 'PT' }
         }
-      }, プレゼン.getId());
+      }, プレゼン.getId(), { fields: 'pageSize' });
       Logger.log('ページサイズ設定完了');
     } catch (e) {
       Logger.log('ページサイズ設定エラー: ' + e.toString());
+      SpreadsheetApp.getUi().alert('エラー', 'ページサイズ設定に失敗しました:\n' + e.toString(), SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
     }
 
     // 最初のスライドを削除
@@ -187,7 +192,7 @@ function テスト生成() {
     Logger.log('URL: ' + プレゼンURL);
     Logger.log('========================================');
 
-    SpreadsheetApp.getUi().alert(`✅ テスト完了！\n\n表紙から${作成枚数}枚を生成しました。\nデザインを確認してください。\n\n${プレゼンURL}`);
+    SpreadsheetApp.getUi().alert(`✅ テスト完了！\n\n縦向きスライド${作成枚数}枚を生成しました。\nデザインを確認してください。\n\n${プレゼンURL}`);
 
     return プレゼンURL;
 
