@@ -190,8 +190,8 @@ function 目次スライドを作成(プレゼン, SNS情報) {
   ];
 
   // 2列レイアウト（安全な固定値・マージン確保）
-  const カード間隔 = 20;
-  const 列幅 = 400;  // (840 - 20) / 2 = 410, use 400 for safety (20pt buffer)
+  const カード間隔 = 30;
+  const 列幅 = 380;  // (840 - 30) / 2 = 405, use 380 for safety (50pt buffer)
   const 項目高さ = 40;
   let 列 = 0;
   let 行 = 0;
@@ -263,8 +263,8 @@ function プロジェクト概要スライドを作成(プレゼン, クライ�
   const コンテンツY = ページヘッダーを作成(スライド, 'PROJECT OVERVIEW', 'プロジェクト概要');
 
   // 2列レイアウト（左右・安全な固定値・マージン確保）
-  const カード間隔 = 20;
-  const 列幅 = 400;  // (840 - 20) / 2 = 410, use 400 for safety (20pt buffer)
+  const カード間隔 = 30;
+  const 列幅 = 380;  // (840 - 30) / 2 = 405, use 380 for safety (50pt buffer)
   const 左列X = 余白.左;
   const 右列X = 余白.左 + 列幅 + カード間隔;
   const カード高さ = 85;
@@ -340,8 +340,8 @@ function クラファン成功データスライドを作成(プレゼン) {
   const コンテンツY = ページヘッダーを作成(スライド, 'SUCCESS METRICS', 'クラファン成功データ', '重要KPI指標');
 
   // 3列レイアウト: 安全な固定値で計算（マージン確保）
-  const カード間隔 = 15;
-  const 列幅 = 265;  // (840 - 30) / 3 = 270, use 265 for safety (15pt buffer)
+  const カード間隔 = 20;
+  const 列幅 = 250;  // (840 - 40) / 3 = 266.67, use 250 for safety (40pt buffer)
   const カード高さ = 115;
 
   // KPI 1: 支援者の80%は身近な人
@@ -361,7 +361,7 @@ function クラファン成功データスライドを作成(プレゼン) {
 
   // 下段: 2列の小型KPIカード
   const 下段Y = コンテンツY + 8 + カード高さ + 8;
-  const 半幅 = 400;  // (840 - 20) / 2 = 410, use 400 for safety (20pt buffer)
+  const 半幅 = 380;  // (840 - 30) / 2 = 405, use 380 for safety (50pt buffer)
   const 下段高さ = 58;
 
   // 活動報告
