@@ -276,8 +276,11 @@ function カードボックスを追加(スライド, left, top, width, height) 
   );
 
   カード.getFill().setSolidFill(色設定.カード背景);
-  カード.getBorder().setWeight(1);
-  カード.getBorder().setSolidFill(色設定.アクセント);
+
+  // 枠線の設定
+  const border = カード.getBorder();
+  border.setWeight(1);
+  border.getLineFill().setSolidFill(色設定.アクセント);
 
   return カード;
 }
