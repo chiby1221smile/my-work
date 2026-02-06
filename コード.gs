@@ -1,759 +1,414 @@
-/**
- * ========================================
- * CAMPFIREマーケティング戦略資料 自動生成ツール
- * ========================================
- *
- * Google Slidesで戦略資料を自動生成します
- * 16:9横サイズ（960 x 540ポイント）
- *
- * 【対応プロジェクト】
- * - 出版プロジェクト
- * - 商品開発プロジェクト
- * - イベント開催プロジェクト
- * - その他あらゆるCAMPFIREプロジェクト
- *
- * 【機能】
- * - スプレッドシートのデータから自動生成
- * - SNS情報に基づく動的なページ生成
- * - プロジェクト内容に応じた柔軟な資料作成
- * - 42〜50ページの戦略資料
- *
- * 【使い方】
- * 1. スプレッドシートにクライアント情報を入力
- * 2. メニューから「🚀 戦略資料を自動生成」を選択
- * 3. 完成するまで待つ
- */
+// ==========================================
+// CAMPFIREマーケティング戦略資料 - Gemini API版
+// ==========================================
 
-// ========================================
-// グローバル変数
-// ========================================
+// 【重要】ここにあなたのGemini APIキーを入力してください
+const MY_API_KEY = "YOUR_API_KEY_HERE";
 
-let 現在のプレゼンID = null;
+// ==========================================
+// 定数設定
+// ==========================================
 
-// ========================================
-// 定数定義
-// ========================================
-
-const 色設定 = {
-  背景色: '#FFF9E6',        // クリーム色
-  アクセント色: '#FF9500',  // オレンジ
-  テキスト濃: '#333333',    // ダークグレー
-  カード背景: '#FFFFFF',    // 白
-  テキスト薄: '#666666',    // ライトグレー
-  アクセント薄: '#FFF3E0',  // 薄いオレンジ
-  ボーダー: '#EEEEEE',      // ボーダー
-  赤: '#D32F2F',             // 赤（警告・必須）
-  暗い背景: '#333333'       // ダーク背景
-};
-
+// A4縦型サイズ（ポイント単位）
 const ページサイズ = {
-  幅: 960,    // 16:9 横（標準プレゼンサイズ）
-  高さ: 540   // 16:9 横
+  幅: 595,  // 21cm = 595pt
+  高さ: 842  // 29.7cm = 842pt
 };
 
+// デザインカラーパレット
+const 色設定 = {
+  背景色: '#FFF9E6',
+  見出し帯: '#FF9500',
+  アクセント: '#FFD966',
+  本文色: '#333333',
+  カード背景: '#FFFFFF',
+  テキスト薄: '#666666'
+};
+
+// 余白設定
 const 余白 = {
   上: 40,
   下: 40,
-  左: 60,
-  右: 60
+  左: 40,
+  右: 40
 };
 
-const コンテンツ幅 = ページサイズ.幅 - 余白.左 - 余白.右;
+// コンテンツエリア
+const コンテンツ幅 = ページサイズ.幅 - 余白.左 - 余白.右; // 515pt
+const コンテンツ高さ = ページサイズ.高さ - 余白.上 - 余白.下; // 762pt
 
+// フォントサイズ範囲（文字見切れ防止用）
 const フォントサイズ = {
-  タイトル: 32,
-  見出し1: 24,
-  見出し2: 18,
-  見出し3: 14,
-  本文: 12,
-  小: 10,
-  極小: 9
+  タイトル最大: 32,
+  タイトル最小: 22,
+  見出し最大: 22,
+  見出し最小: 16,
+  本文最大: 16,
+  本文最小: 11,
+  小文字最大: 12,
+  小文字最小: 9
 };
 
-// ========================================
-// メニュー作成
-// ========================================
+// ==========================================
+// メニュー追加
+// ==========================================
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('📊 CAMPFIRE戦略')
-    .addItem('🧪 テスト（1枚だけ生成）', 'テスト生成')
+  ui.createMenu('🤖 CAMPFIRE AI戦略')
+    .addItem('🚀 戦略資料を自動生成（Gemini版）', '戦略資料を自動生成_Gemini')
+    .addItem('🔌 API接続テスト', 'APIテスト')
     .addSeparator()
-    .addItem('🚀 戦略資料を自動生成（分割版）', '戦略資料を自動生成_分割')
     .addItem('📂 最新資料のURL表示', '最新資料のURL表示')
-    .addSeparator()
-    .addItem('📝 テンプレート行を追加', 'テンプレート行を追加')
     .addToUi();
 }
 
-function 最新資料のURL表示() {
-  const url = PropertiesService.getUserProperties().getProperty('最新プレゼンURL');
+// ==========================================
+// Gemini API接続関数（リトライ機能付き）
+// ==========================================
 
-  if (url) {
-    const ui = SpreadsheetApp.getUi();
-    const htmlOutput = HtmlService.createHtmlOutput(
-      `<p>最新の戦略資料:</p>
-       <p><a href="${url}" target="_blank">${url}</a></p>
-       <p><button onclick="google.script.host.close()">閉じる</button></p>`
-    ).setWidth(500).setHeight(150);
-
-    ui.showModalDialog(htmlOutput, '最新資料のURL');
-  } else {
-    SpreadsheetApp.getUi().alert('まだ資料が生成されていません。');
+/**
+ * Gemini APIでテキストを生成（Not Found対策のリトライ機能付き）
+ * @param {string} prompt - プロンプト
+ * @return {string} 生成されたテキスト
+ */
+function Geminiでテキスト生成(prompt) {
+  if (MY_API_KEY === "YOUR_API_KEY_HERE" || !MY_API_KEY) {
+    throw new Error("❌ APIキーが設定されていません。コード.gsの MY_API_KEY を設定してください。");
   }
-}
 
-function テンプレート行を追加() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const lastRow = sheet.getLastRow();
-  const newRow = lastRow + 1;
+  // 試行するモデルのリスト（優先順位順）
+  const モデルリスト = [
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-pro',
+    'gemini-1.5-pro'
+  ];
 
-  sheet.getRange(newRow, 1, 1, 6).setValues([[
-    '起案者名（例：山田太郎）',
-    300000,
-    'プロジェクトの背景を記入してください',
-    'https://x.com/username\nhttps://note.com/username',
-    '実現したいことを記入してください',
-    'プロジェクト名を記入してください（例：○○制作プロジェクト）'
-  ]]);
+  let 最後のエラー = null;
 
-  SpreadsheetApp.getUi().alert('テンプレート行を追加しました。\n内容を編集してご利用ください。');
-}
+  // 各モデルを順番に試行
+  for (let i = 0; i < モデルリスト.length; i++) {
+    const モデル名 = モデルリスト[i];
+    Logger.log(`🔄 モデル試行中: ${モデル名} (${i + 1}/${モデルリスト.length})`);
 
-// ========================================
-// テスト用関数（1枚だけ生成）
-// ========================================
-
-function テスト生成() {
-  try {
-    Logger.log('========================================');
-    Logger.log('テスト生成開始（横向き4枚）');
-    Logger.log('========================================');
-
-    // テスト用クライアントデータ
-    const テストデータ = {
-      起案者名: 'テストクライアント',
-      プロジェクト名: 'テストプロジェクト',
-      目標金額: 500000,
-      公開日: '2026年3月1日',
-      終了日: '2026年3月31日',
-      URL一覧: 'https://twitter.com/test,https://instagram.com/test,https://facebook.com/test'
-    };
-
-    const SNS情報 = SNSのURLを解析(テストデータ.URL一覧);
-
-    // テスト用プレゼンテーション作成
-    const プレゼン名 = 'テスト_横向きスライド_' + new Date().getTime();
-    const プレゼン = SlidesApp.create(プレゼン名);
-    現在のプレゼンID = プレゼン.getId();
-
-    Logger.log('プレゼンテーションID: ' + 現在のプレゼンID);
-    Logger.log('Google Slidesのデフォルトサイズ (16:9) を使用');
-
-    // 最初のスライドを削除
-    const スライド一覧 = プレゼン.getSlides();
-    if (スライド一覧.length > 0) {
-      スライド一覧[0].remove();
-    }
-
-    // スライド作成（表紙から4枚：横向きデザイン確認）
-    Logger.log('1. 表紙スライド作成中...');
-    表紙スライドを作成(プレゼン, テストデータ, SNS情報);
-
-    Logger.log('2. 目次スライド作成中...');
-    目次スライドを作成(プレゼン, SNS情報);
-
-    Logger.log('3. プロジェクト概要スライド作成中...');
-    プロジェクト概要スライドを作成(プレゼン, テストデータ);
-
-    Logger.log('4. クラファン成功データスライド作成中...');
-    クラファン成功データスライドを作成(プレゼン);
-
-    const 作成枚数 = プレゼン.getSlides().length;
-    const プレゼンURL = プレゼン.getUrl();
-
-    Logger.log('========================================');
-    Logger.log(`テスト生成完了: ${作成枚数}枚`);
-    Logger.log('URL: ' + プレゼンURL);
-    Logger.log('========================================');
-
-    SpreadsheetApp.getUi().alert(`✅ テスト完了！\n\n横向きスライド${作成枚数}枚を生成しました。\nデザインを確認してください。\n\n${プレゼンURL}`);
-
-    return プレゼンURL;
-
-  } catch (エラー) {
-    Logger.log('エラー発生: ' + エラー.toString());
-    Logger.log('スタックトレース: ' + エラー.stack);
-    SpreadsheetApp.getUi().alert('エラー', 'エラーが発生しました:\n\n' + エラー.toString(), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw エラー;
-  }
-}
-
-// ========================================
-// メイン処理（分割版）
-// ========================================
-
-function 戦略資料を自動生成_分割() {
-  try {
-    Logger.log('========================================');
-    Logger.log('戦略資料生成開始（分割版）');
-    Logger.log('========================================');
-
-    const クライアントデータ = クライアントを選択();
-    if (!クライアントデータ) {
-      Logger.log('クライアント選択がキャンセルされました');
-      return;
-    }
-
-    Logger.log('選択されたクライアント: ' + クライアントデータ.起案者名);
-
-    メッセージ表示('処理開始',
-      '戦略資料の生成を開始します。\n\n' +
-      '【分割生成方式】\n' +
-      'パート1: 表紙〜第2章\n' +
-      'パート2: 第3章〜第5章\n' +
-      'パート3: 第6章〜第9章\n\n' +
-      '各パート完了時に通知が表示されます。'
-    );
-
-    const SNS情報 = SNSのURLを解析(クライアントデータ.URL一覧);
-
-    // パート1: 表紙〜第2章
-    Logger.log('=== パート1生成開始 ===');
-    const プレゼン = プレゼンテーションを作成(クライアントデータ);
-    const プレゼンID = プレゼン.getId();
-
-    表紙スライドを作成(プレゼン, クライアントデータ, SNS情報);
-    目次スライドを作成(プレゼン, SNS情報);
-    第1章を作成(プレゼン, クライアントデータ);
-    第2章を作成(プレゼン, クライアントデータ);
-
-    Logger.log('パート1完了: ' + プレゼン.getSlides().length + 'スライド');
-    メッセージ表示('パート1完了', `表紙〜第2章の生成が完了しました。\n現在のスライド数: ${プレゼン.getSlides().length}ページ\n\n続けてパート2を生成します。`);
-
-    // パート2: 第3章〜第5章
-    Logger.log('=== パート2生成開始 ===');
-    第3章を作成(プレゼン, クライアントデータ);
-    第4章を作成(プレゼン, クライアントデータ);
-    第5章を作成(プレゼン, クライアントデータ, SNS情報);
-
-    Logger.log('パート2完了: ' + プレゼン.getSlides().length + 'スライド');
-    メッセージ表示('パート2完了', `第3章〜第5章の生成が完了しました。\n現在のスライド数: ${プレゼン.getSlides().length}ページ\n\n続けてパート3を生成します。`);
-
-    // パート3: 第6章〜第9章
-    Logger.log('=== パート3生成開始 ===');
-    第6章を作成(プレゼン, クライアントデータ);
-    第7章を作成(プレゼン, クライアントデータ);
-    第8章を作成(プレゼン, クライアントデータ);
-    第9章を作成(プレゼン, クライアントデータ);
-
-    const プレゼンURL = プレゼン.getUrl();
-    const 総スライド数 = プレゼン.getSlides().length;
-
-    PropertiesService.getUserProperties().setProperty('最新プレゼンURL', プレゼンURL);
-
-    // スプレッドシートのG列にURLを書き込む
     try {
-      const シート = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-      シート.getRange(クライアントデータ.行番号, 7).setValue(プレゼンURL);
-      Logger.log(`G${クライアントデータ.行番号}にURLを書き込みました`);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${モデル名}:generateContent?key=${MY_API_KEY}`;
+
+      const payload = {
+        "contents": [{
+          "parts": [{
+            "text": prompt
+          }]
+        }],
+        "generationConfig": {
+          "temperature": 0.7,
+          "topK": 40,
+          "topP": 0.95,
+          "maxOutputTokens": 2048
+        }
+      };
+
+      const options = {
+        "method": "post",
+        "contentType": "application/json",
+        "payload": JSON.stringify(payload),
+        "muteHttpExceptions": true
+      };
+
+      const response = UrlFetchApp.fetch(url, options);
+      const responseCode = response.getResponseCode();
+
+      if (responseCode === 200) {
+        const result = JSON.parse(response.getContentText());
+
+        if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+          const text = result.candidates[0].content.parts[0].text;
+          Logger.log(`✅ 成功: ${モデル名}で生成完了`);
+          return text;
+        }
+      } else if (responseCode === 404) {
+        Logger.log(`⚠️ モデル ${モデル名} が見つかりません（404 Not Found）`);
+        最後のエラー = `モデル ${モデル名} は利用できません`;
+        continue; // 次のモデルを試行
+      } else {
+        const errorText = response.getContentText();
+        Logger.log(`⚠️ エラー（${responseCode}）: ${errorText}`);
+        最後のエラー = `HTTP ${responseCode}: ${errorText}`;
+        continue;
+      }
     } catch (e) {
-      Logger.log('URL書き込みエラー（処理は続行）: ' + e.toString());
+      Logger.log(`⚠️ 例外発生: ${e.message}`);
+      最後のエラー = e.message;
+      continue;
     }
+  }
 
-    Logger.log('========================================');
-    Logger.log('戦略資料生成完了');
-    Logger.log('URL: ' + プレゼンURL);
-    Logger.log('総スライド数: ' + 総スライド数);
-    Logger.log('========================================');
+  // すべてのモデルで失敗した場合
+  throw new Error(`❌ すべてのモデルで接続失敗しました。最後のエラー: ${最後のエラー}`);
+}
 
-    メッセージ表示('✅ 完成しました！',
-      `全ての戦略資料の生成が完了しました。\n\n` +
-      `クライアント: ${クライアントデータ.起案者名}\n` +
-      `目標金額: ¥${クライアントデータ.目標金額.toLocaleString()}\n` +
-      `総スライド数: ${総スライド数}ページ\n\n` +
-      `スプレッドシートのG列にURLを記録しました。\n\n` +
-      `以下のURLをコピーして開いてください:\n${プレゼンURL}`
+// ==========================================
+// API接続テスト関数
+// ==========================================
+
+function APIテスト() {
+  try {
+    SpreadsheetApp.getUi().alert('🔌 API接続テスト開始\n\n簡単なテキストを生成します...');
+
+    const テストプロンプト = "「こんにちは」と日本語で一言返してください。";
+    const 結果 = Geminiでテキスト生成(テストプロンプト);
+
+    SpreadsheetApp.getUi().alert(`✅ API接続成功！\n\nGeminiの応答:\n${結果}`);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert(`❌ API接続失敗\n\nエラー内容:\n${e.message}\n\n対処方法:\n1. MY_API_KEYが正しく設定されているか確認\n2. https://aistudio.google.com/app/apikey でAPIキーを確認`);
+  }
+}
+
+// ==========================================
+// プロジェクトデータ取得
+// ==========================================
+
+/**
+ * スプレッドシートから選択されたクライアントのデータを取得
+ * @return {Object} クライアントデータ
+ */
+function クライアントデータを取得() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const データ範囲 = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6);
+  const データ = データ範囲.getValues();
+
+  // データが存在するか確認
+  const 有効データ = データ.filter(row => row[0] !== "" || row[5] !== "");
+
+  if (有効データ.length === 0) {
+    throw new Error("❌ スプレッドシートにデータがありません。\n\nA列〜F列に以下を入力してください:\nA: 起案者名\nB: 目標金額\nC: 背景\nD: URL\nE: 実現したいこと\nF: プロジェクト名");
+  }
+
+  let 選択行 = 0;
+
+  // 複数データがある場合は選択ダイアログを表示
+  if (有効データ.length > 1) {
+    const ui = SpreadsheetApp.getUi();
+    const 選択肢 = 有効データ.map((row, index) =>
+      `${index + 1}. ${row[5] || row[0] || '（名前なし）'}`
+    ).join('\n');
+
+    const 応答 = ui.prompt(
+      'クライアント選択',
+      `生成するクライアントの番号を入力してください:\n\n${選択肢}`,
+      ui.ButtonSet.OK_CANCEL
     );
 
-    return プレゼンURL;
-
-  } catch (エラー) {
-    Logger.log('エラー発生: ' + エラー.toString());
-    Logger.log('スタックトレース: ' + エラー.stack);
-    メッセージ表示('エラー', 'エラーが発生しました:\n\n' + エラー.toString());
-    throw エラー;
-  }
-}
-
-function クライアントを選択() {
-  const シート = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const 最終行 = シート.getLastRow();
-
-  if (最終行 < 2) {
-    メッセージ表示('エラー', 'データが入力されていません。\nスプレッドシートにクライアント情報を入力してください。');
-    return null;
-  }
-
-  const データ範囲 = シート.getRange(2, 1, 最終行 - 1, 6);
-  const 値配列 = データ範囲.getValues();
-
-  const クライアント一覧 = [];
-  値配列.forEach((行, インデックス) => {
-    if (行[0] && 行[0].trim() !== '') {
-      クライアント一覧.push({
-        行番号: インデックス + 2,
-        起案者名: 行[0],
-        目標金額: parseInt(行[1]) || 300000,
-        背景: 行[2] || '',
-        URL一覧: 行[3] || '',
-        実現したいこと: 行[4] || '',
-        プロジェクト名: 行[5] || ''
-      });
-    }
-  });
-
-  if (クライアント一覧.length === 0) {
-    メッセージ表示('エラー', '有効なクライアントデータが見つかりません。\n起案者名を入力してください。');
-    return null;
-  }
-
-  if (クライアント一覧.length === 1) {
-    return クライアント一覧[0];
-  }
-
-  const ui = SpreadsheetApp.getUi();
-  let メッセージ = 'クライアントを選択してください（番号を入力）:\n\n';
-  クライアント一覧.forEach((クライアント, インデックス) => {
-    メッセージ += `${インデックス + 1}. ${クライアント.起案者名} (¥${クライアント.目標金額.toLocaleString()})\n`;
-  });
-  メッセージ += '\n番号を入力してOKを押してください:';
-
-  const 応答 = ui.prompt('クライアント選択', メッセージ, ui.ButtonSet.OK_CANCEL);
-
-  if (応答.getSelectedButton() === ui.Button.CANCEL) {
-    return null;
-  }
-
-  const 選択番号 = parseInt(応答.getResponseText()) - 1;
-  if (選択番号 >= 0 && 選択番号 < クライアント一覧.length) {
-    return クライアント一覧[選択番号];
-  }
-
-  メッセージ表示('エラー', '無効な番号です。');
-  return null;
-}
-
-function プレゼンテーションを作成(クライアントデータ) {
-  const プレゼン名 = `${クライアントデータ.起案者名}様_CAMPFIREマーケティング戦略資料`;
-  const プレゼン = SlidesApp.create(プレゼン名);
-
-  // グローバル変数にプレゼンIDを保存
-  現在のプレゼンID = プレゼン.getId();
-
-  Logger.log('プレゼンテーション名: ' + プレゼン名);
-
-  // 16:9横サイズに設定
-  try {
-    Slides.Presentations.patch({
-      pageSize: {
-        width: { magnitude: ページサイズ.幅, unit: 'PT' },
-        height: { magnitude: ページサイズ.高さ, unit: 'PT' }
+    if (応答.getSelectedButton() === ui.Button.OK) {
+      選択行 = parseInt(応答.getResponseText()) - 1;
+      if (選択行 < 0 || 選択行 >= 有効データ.length) {
+        throw new Error("❌ 無効な番号です");
       }
-    }, プレゼン.getId());
-
-    Logger.log('ページサイズ設定完了: 16:9横 (' + ページサイズ.幅 + ' x ' + ページサイズ.高さ + ' pt)');
-  } catch (e) {
-    Logger.log('ページサイズ設定エラー: ' + e.toString());
-  }
-
-  const スライド一覧 = プレゼン.getSlides();
-  if (スライド一覧.length > 0) {
-    スライド一覧[0].remove();
-  }
-
-  return プレゼン;
-}
-
-function SNSのURLを解析(URL文字列) {
-  const SNS情報 = {
-    Xあり: false,
-    Instagramあり: false,
-    Facebookあり: false,
-    Noteあり: false,
-    Amebaあり: false,
-    URL一覧: []
-  };
-
-  if (!URL文字列) return SNS情報;
-
-  const URL配列 = URL文字列.split(/[\n,]+/).map(url => url.trim()).filter(url => url);
-  SNS情報.URL一覧 = URL配列;
-
-  URL配列.forEach(url => {
-    const 小文字URL = url.toLowerCase();
-    if (小文字URL.includes('twitter.com') || 小文字URL.includes('x.com')) {
-      SNS情報.Xあり = true;
-    } else if (小文字URL.includes('instagram.com')) {
-      SNS情報.Instagramあり = true;
-    } else if (小文字URL.includes('facebook.com')) {
-      SNS情報.Facebookあり = true;
-    } else if (小文字URL.includes('note.com') || 小文字URL.includes('note.mu')) {
-      SNS情報.Noteあり = true;
-    } else if (小文字URL.includes('ameblo.jp') || 小文字URL.includes('ameba.jp')) {
-      SNS情報.Amebaあり = true;
+    } else {
+      throw new Error("キャンセルされました");
     }
-  });
-
-  Logger.log('解析されたSNS: X=' + SNS情報.Xあり + ', Note=' + SNS情報.Noteあり + ', Ameba=' + SNS情報.Amebaあり + ', Instagram=' + SNS情報.Instagramあり);
-
-  return SNS情報;
-}
-
-// ========================================
-// ユーティリティ関数
-// ========================================
-
-function メッセージ表示(タイトル, メッセージ) {
-  try {
-    SpreadsheetApp.getUi().alert(タイトル, メッセージ, SpreadsheetApp.getUi().ButtonSet.OK);
-  } catch (e) {
-    Logger.log('メッセージ表示エラー: ' + e.toString());
   }
+
+  const 行 = 有効データ[選択行];
+
+  return {
+    起案者名: 行[0] || "起案者",
+    目標金額: 行[1] || 300000,
+    背景: 行[2] || "",
+    URL: 行[3] || "",
+    実現したいこと: 行[4] || "",
+    プロジェクト名: 行[5] || "新規プロジェクト"
+  };
 }
 
-function ポイントをインチに変換(ポイント) {
-  return ポイント / 72;
+// ==========================================
+// スライド作成ユーティリティ
+// ==========================================
+
+/**
+ * 新しいプレゼンテーションを作成
+ * @param {string} タイトル - プレゼンテーションのタイトル
+ * @return {Object} プレゼンテーションオブジェクト
+ */
+function プレゼンテーションを作成(タイトル) {
+  const presentation = SlidesApp.create(タイトル);
+
+  // A4縦型に設定
+  presentation.getPageWidth();  // 既存サイズを取得（初期化のため）
+
+  // ページサイズを設定（ポイント単位）
+  const ページ = presentation.getSlides()[0];
+
+  // 注: Google Slides APIではページサイズ変更が制限されているため、
+  // SlidesApp.create()後に手動で設定が必要な場合があります
+  // 以下は将来的なAPI対応のための準備コード
+
+  Logger.log(`📊 プレゼンテーション作成: ${タイトル}`);
+  Logger.log(`📐 設定サイズ: ${ページサイズ.幅} x ${ページサイズ.高さ} pt`);
+
+  return presentation;
 }
 
 /**
- * Slides APIでテキストボックスを作成（autofit制御のため）
+ * 背景色を設定
+ * @param {Slide} スライド - 対象スライド
  */
-function テキストを追加(スライド, テキスト, オプション) {
-  // SlidesApp だけを使って実装（同期問題なし）
+function 背景色を設定(スライド) {
+  const 背景 = スライド.getBackground();
+  背景.setSolidFill(色設定.背景色);
+}
 
-  // テキストボックスを作成
-  const テキストボックス = スライド.insertShape(
-    SlidesApp.ShapeType.TEXT_BOX,
-    オプション.左位置,
-    オプション.上位置,
-    オプション.幅,
-    オプション.高さ
-  );
-
-  // テキストを設定
-  const テキスト範囲 = テキストボックス.getText();
-  テキスト範囲.setText(テキスト);
-
-  // スタイルを適用
-  const スタイル = テキスト範囲.getTextStyle();
+/**
+ * テキストボックスを追加
+ * @param {Slide} スライド - 対象スライド
+ * @param {string} テキスト - 表示テキスト
+ * @param {number} left - 左位置
+ * @param {number} top - 上位置
+ * @param {number} width - 幅
+ * @param {number} height - 高さ
+ * @param {Object} オプション - スタイル設定
+ * @return {Shape} テキストボックス
+ */
+function テキストボックスを追加(スライド, テキスト, left, top, width, height, オプション = {}) {
+  const shape = スライド.insertTextBox(テキスト, left, top, width, height);
+  const textRange = shape.getText();
 
   // フォントサイズ
   if (オプション.フォントサイズ) {
-    スタイル.setFontSize(オプション.フォントサイズ);
+    textRange.getTextStyle().setFontSize(オプション.フォントサイズ);
   }
 
   // 太字
   if (オプション.太字) {
-    スタイル.setBold(true);
+    textRange.getTextStyle().setBold(true);
   }
 
-  // 色
-  if (オプション.色) {
-    スタイル.setForegroundColor(オプション.色);
+  // 文字色
+  if (オプション.文字色) {
+    textRange.getTextStyle().setForegroundColor(オプション.文字色);
   }
 
-  // 配置
-  if (オプション.配置) {
-    const 段落スタイル = テキスト範囲.getParagraphStyle();
-    if (オプション.配置 === '中央') {
-      段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
-    } else if (オプション.配置 === '右') {
-      段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.END);
-    } else {
-      段落スタイル.setParagraphAlignment(SlidesApp.ParagraphAlignment.START);
-    }
+  // 背景色
+  if (オプション.背景色) {
+    shape.getFill().setSolidFill(オプション.背景色);
+  } else {
+    shape.getFill().setTransparent();
   }
 
-  return テキストボックス;
+  // 枠線なし
+  shape.getBorder().setTransparent();
+
+  // テキスト整列
+  if (オプション.中央揃え) {
+    textRange.getParagraphStyle().setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
+  }
+
+  return shape;
 }
 
 /**
- * HEX色をRGBに変換
+ * 文字数に応じて最適なフォントサイズを計算（見切れ防止）
+ * @param {string} テキスト - 対象テキスト
+ * @param {number} 最大サイズ - 最大フォントサイズ
+ * @param {number} 最小サイズ - 最小フォントサイズ
+ * @param {number} 基準文字数 - 基準となる文字数（デフォルト50文字）
+ * @return {number} 最適なフォントサイズ
  */
-function hexToRgb(hex) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? {
-    red: parseInt(result[1], 16) / 255,
-    green: parseInt(result[2], 16) / 255,
-    blue: parseInt(result[3], 16) / 255
-  } : { red: 1, green: 1, blue: 1 };
+function 最適フォントサイズを計算(テキスト, 最大サイズ, 最小サイズ, 基準文字数 = 50) {
+  const 文字数 = テキスト.length;
+
+  if (文字数 <= 基準文字数) {
+    return 最大サイズ;
+  }
+
+  // 文字数に比例してサイズを縮小
+  const 縮小率 = 基準文字数 / 文字数;
+  const 計算サイズ = Math.floor(最大サイズ * 縮小率);
+
+  // 最小サイズを下回らないようにする
+  return Math.max(計算サイズ, 最小サイズ);
 }
 
 /**
- * SlidesApp で図形を追加（ポイント単位で直接指定）
+ * 見出し帯を追加
+ * @param {Slide} スライド - 対象スライド
+ * @param {string} テキスト - 見出しテキスト
+ * @param {number} top - 上位置
  */
-function 図形を追加(スライド, 図形タイプ, オプション) {
-  let 図形;
+function 見出し帯を追加(スライド, テキスト, top = 余白.上) {
+  const 帯高さ = 50;
+  const 帯 = スライド.insertShape(
+    SlidesApp.ShapeType.RECTANGLE,
+    余白.左,
+    top,
+    コンテンツ幅,
+    帯高さ
+  );
 
-  if (図形タイプ === '長方形') {
-    図形 = スライド.insertShape(SlidesApp.ShapeType.RECTANGLE,
-      オプション.左位置,
-      オプション.上位置,
-      オプション.幅,
-      オプション.高さ
-    );
-  } else if (図形タイプ === '楕円') {
-    図形 = スライド.insertShape(SlidesApp.ShapeType.ELLIPSE,
-      オプション.左位置,
-      オプション.上位置,
-      オプション.幅,
-      オプション.高さ
-    );
-  } else if (図形タイプ === '角丸長方形') {
-    図形 = スライド.insertShape(SlidesApp.ShapeType.ROUND_RECTANGLE,
-      オプション.左位置,
-      オプション.上位置,
-      オプション.幅,
-      オプション.高さ
-    );
-  }
+  帯.getFill().setSolidFill(色設定.見出し帯);
+  帯.getBorder().setTransparent();
 
-  if (図形 && オプション.塗りつぶし色) {
-    図形.getFill().setSolidFill(オプション.塗りつぶし色);
-  }
+  const textRange = 帯.getText();
+  textRange.setText(テキスト);
+  textRange.getTextStyle()
+    .setFontSize(20)
+    .setBold(true)
+    .setForegroundColor('#FFFFFF');  // 見出しのみ白文字OK
 
-  if (図形) {
-    図形.getBorder().setTransparent();
-  }
+  textRange.getParagraphStyle()
+    .setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER);
 
-  return 図形;
-}
-
-// ========================================
-// 共通スライドパーツ関数
-// ========================================
-
-/**
- * ページヘッダー（英字サブタイトル + 日本語タイトル + アクセントライン）
- */
-function ページヘッダーを作成(スライド, 英字, 日本語タイトル, サブタイトル) {
-  if (英字) {
-    テキストを追加(スライド, 英字, {
-      左位置: 余白.左, 上位置: 余白.上 - 5, 幅: コンテンツ幅, 高さ: 18,
-      フォントサイズ: フォントサイズ.小, 色: 色設定.テキスト薄
-    });
-  }
-
-  テキストを追加(スライド, 日本語タイトル, {
-    左位置: 余白.左, 上位置: 英字 ? 余白.上 + 12 : 余白.上, 幅: コンテンツ幅, 高さ: 36,
-    フォントサイズ: フォントサイズ.見出し1, 太字: true, 色: 色設定.テキスト濃
-  });
-
-  if (サブタイトル) {
-    テキストを追加(スライド, サブタイトル, {
-      左位置: 余白.左, 上位置: 英字 ? 余白.上 + 45 : 余白.上 + 35, 幅: コンテンツ幅, 高さ: 22,
-      フォントサイズ: フォントサイズ.見出し3, 太字: true, 色: 色設定.アクセント色
-    });
-  }
-
-  const ラインY = サブタイトル ? (英字 ? 余白.上 + 68 : 余白.上 + 58) : (英字 ? 余白.上 + 48 : 余白.上 + 38);
-  図形を追加(スライド, '長方形', {
-    左位置: 余白.左, 上位置: ラインY, 幅: 100, 高さ: 3, 塗りつぶし色: 色設定.アクセント色
-  });
-
-  return ラインY + 10;
+  // 垂直中央揃え
+  帯.setContentAlignment(SlidesApp.ContentAlignment.MIDDLE);
 }
 
 /**
- * 章タイトルスライド（オレンジ背景）
+ * カードボックスを追加
+ * @param {Slide} スライド - 対象スライド
+ * @param {number} left - 左位置
+ * @param {number} top - 上位置
+ * @param {number} width - 幅
+ * @param {number} height - 高さ
+ * @return {Shape} カード
  */
-function 章タイトルスライドを作成(プレゼン, 章番号, タイトル, サブタイトル) {
-  const スライド = プレゼン.appendSlide(SlidesApp.PredefinedLayout.BLANK);
-  スライド.getBackground().setSolidFill(色設定.アクセント色);
+function カードボックスを追加(スライド, left, top, width, height) {
+  const カード = スライド.insertShape(
+    SlidesApp.ShapeType.ROUND_RECTANGLE,
+    left,
+    top,
+    width,
+    height
+  );
 
-  テキストを追加(スライド, 章番号, {
-    左位置: 余白.左, 上位置: 160, 幅: 200, 高さ: 80,
-    フォントサイズ: 64, 太字: true, 色: '#FFFFFF'
-  });
+  カード.getFill().setSolidFill(色設定.カード背景);
+  カード.getBorder().setWeight(1);
+  カード.getBorder().setSolidFill(色設定.アクセント);
 
-  テキストを追加(スライド, タイトル, {
-    左位置: 余白.左, 上位置: 260, 幅: コンテンツ幅, 高さ: 60,
-    フォントサイズ: フォントサイズ.タイトル, 太字: true, 色: '#FFFFFF'
-  });
+  return カード;
+}
 
-  if (サブタイトル) {
-    テキストを追加(スライド, サブタイトル, {
-      左位置: 余白.左, 上位置: 330, 幅: コンテンツ幅, 高さ: 40,
-      フォントサイズ: フォントサイズ.見出し3, 色: '#FFFFFF'
-    });
+// ==========================================
+// 最新URLを表示
+// ==========================================
+
+function 最新資料のURL表示() {
+  const properties = PropertiesService.getScriptProperties();
+  const url = properties.getProperty('LAST_PRESENTATION_URL');
+
+  if (url) {
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('📂 最新の資料', `以下のURLをクリックして開いてください:\n\n${url}`, ui.ButtonSet.OK);
+  } else {
+    SpreadsheetApp.getUi().alert('❌ まだ資料が生成されていません');
   }
 }
 
 /**
- * 情報カード（白背景・左オレンジボーダー）
+ * URLを保存
+ * @param {string} url - プレゼンテーションURL
  */
-function 情報カードを作成(スライド, 左位置, 上位置, 幅, 高さ, タイトル, 内容, オプション) {
-  オプション = オプション || {};
-
-  図形を追加(スライド, '長方形', {
-    左位置: 左位置, 上位置: 上位置, 幅: 幅, 高さ: 高さ,
-    塗りつぶし色: オプション.背景色 || 色設定.カード背景
-  });
-
-  if (オプション.左ボーダー !== false) {
-    図形を追加(スライド, '長方形', {
-      左位置: 左位置, 上位置: 上位置, 幅: 5, 高さ: 高さ,
-      塗りつぶし色: オプション.ボーダー色 || 色設定.アクセント色
-    });
-  }
-
-  if (オプション.上ボーダー) {
-    図形を追加(スライド, '長方形', {
-      左位置: 左位置, 上位置: 上位置, 幅: 幅, 高さ: 5,
-      塗りつぶし色: オプション.ボーダー色 || 色設定.アクセント色
-    });
-  }
-
-  if (タイトル) {
-    テキストを追加(スライド, タイトル, {
-      左位置: 左位置 + 15, 上位置: 上位置 + 10, 幅: 幅 - 30, 高さ: 20,
-      フォントサイズ: オプション.タイトルサイズ || フォントサイズ.本文,
-      太字: true, 色: オプション.タイトル色 || 色設定.アクセント色
-    });
-  }
-
-  if (内容) {
-    テキストを追加(スライド, 内容, {
-      左位置: 左位置 + 15, 上位置: 上位置 + (タイトル ? 32 : 10), 幅: 幅 - 30, 高さ: 高さ - (タイトル ? 42 : 20),
-      フォントサイズ: オプション.内容サイズ || フォントサイズ.小,
-      色: オプション.内容色 || 色設定.テキスト濃
-    });
-  }
-}
-
-/**
- * ラベルバッジ（角丸四角＋テキスト）
- */
-function ラベルを作成(スライド, 左位置, 上位置, テキスト, オプション) {
-  オプション = オプション || {};
-  const 幅 = オプション.幅 || 100;
-  const 高さ = オプション.高さ || 22;
-
-  図形を追加(スライド, '角丸長方形', {
-    左位置: 左位置, 上位置: 上位置, 幅: 幅, 高さ: 高さ,
-    塗りつぶし色: オプション.背景色 || 色設定.アクセント色
-  });
-
-  テキストを追加(スライド, テキスト, {
-    左位置: 左位置, 上位置: 上位置 + 3, 幅: 幅, 高さ: 高さ - 6,
-    フォントサイズ: オプション.フォントサイズ || フォントサイズ.極小,
-    太字: true, 色: オプション.文字色 || '#FFFFFF', 配置: '中央'
-  });
-}
-
-/**
- * タイムライン丸アイコン + ラベル
- */
-function タイムライン項目を作成(スライド, 左位置, 上位置, ラベルテキスト, タイトル, 内容リスト, オプション) {
-  オプション = オプション || {};
-  const カード幅 = オプション.カード幅 || (コンテンツ幅 - 80);
-
-  // 丸アイコン
-  図形を追加(スライド, '楕円', {
-    左位置: 左位置, 上位置: 上位置 + 5, 幅: 16, 高さ: 16,
-    塗りつぶし色: 色設定.アクセント色
-  });
-
-  // ラベル
-  if (ラベルテキスト) {
-    ラベルを作成(スライド, 左位置 + 30, 上位置, ラベルテキスト, {
-      幅: 80, 高さ: 20, フォントサイズ: フォントサイズ.極小
-    });
-  }
-
-  // カード
-  const カード上位置 = 上位置 + 28;
-  図形を追加(スライド, '長方形', {
-    左位置: 左位置 + 30, 上位置: カード上位置, 幅: カード幅, 高さ: オプション.カード高さ || 90,
-    塗りつぶし色: 色設定.カード背景
-  });
-
-  図形を追加(スライド, '長方形', {
-    左位置: 左位置 + 30, 上位置: カード上位置, 幅: 5, 高さ: オプション.カード高さ || 90,
-    塗りつぶし色: 色設定.アクセント色
-  });
-
-  if (タイトル) {
-    テキストを追加(スライド, タイトル, {
-      左位置: 左位置 + 48, 上位置: カード上位置 + 8, 幅: カード幅 - 30, 高さ: 22,
-      フォントサイズ: フォントサイズ.見出し3, 太字: true, 色: 色設定.テキスト濃
-    });
-  }
-
-  if (内容リスト && 内容リスト.length > 0) {
-    const 内容テキスト = 内容リスト.join('\n');
-    テキストを追加(スライド, 内容テキスト, {
-      左位置: 左位置 + 48, 上位置: カード上位置 + 30, 幅: カード幅 - 30, 高さ: (オプション.カード高さ || 90) - 38,
-      フォントサイズ: フォントサイズ.小, 色: 色設定.テキスト薄
-    });
-  }
-}
-
-/**
- * 番号付きステップカード（縦並び）
- */
-function ステップカードを作成(スライド, 左位置, 上位置, 番号, タイトル, 説明, オプション) {
-  オプション = オプション || {};
-  const 幅 = オプション.幅 || コンテンツ幅;
-  const 高さ = オプション.高さ || 80;
-
-  図形を追加(スライド, '長方形', {
-    左位置: 左位置, 上位置: 上位置, 幅: 幅, 高さ: 高さ,
-    塗りつぶし色: 色設定.カード背景
-  });
-
-  // 番号丸
-  図形を追加(スライド, '楕円', {
-    左位置: 左位置 + 15, 上位置: 上位置 + (高さ - 32) / 2, 幅: 32, 高さ: 32,
-    塗りつぶし色: 色設定.アクセント色
-  });
-
-  テキストを追加(スライド, 番号, {
-    左位置: 左位置 + 15, 上位置: 上位置 + (高さ - 32) / 2 + 6, 幅: 32, 高さ: 20,
-    フォントサイズ: フォントサイズ.見出し3, 太字: true, 色: '#FFFFFF', 配置: '中央'
-  });
-
-  テキストを追加(スライド, タイトル, {
-    左位置: 左位置 + 60, 上位置: 上位置 + 10, 幅: 幅 - 80, 高さ: 22,
-    フォントサイズ: フォントサイズ.見出し3, 太字: true, 色: 色設定.テキスト濃
-  });
-
-  if (説明) {
-    テキストを追加(スライド, 説明, {
-      左位置: 左位置 + 60, 上位置: 上位置 + 34, 幅: 幅 - 80, 高さ: 高さ - 42,
-      フォントサイズ: フォントサイズ.小, 色: 色設定.テキスト薄
-    });
-  }
-}
-
-/**
- * 簡易スライド（共通テンプレート: タイトル + カード項目リスト）
- * 横長最適化版
- */
-function 簡易スライドを作成(プレゼン, タイトル, 項目一覧, オプション) {
-  オプション = オプション || {};
-  const スライド = プレゼン.appendSlide(SlidesApp.PredefinedLayout.BLANK);
-  スライド.getBackground().setSolidFill(色設定.背景色);
-
-  const コンテンツ開始Y = ページヘッダーを作成(スライド, オプション.英字 || null, タイトル);
-
-  let y = コンテンツ開始Y + 15;
-  const 利用可能高さ = ページサイズ.高さ - y - 余白.下;
-  const 項目高さ = Math.min(100, Math.floor(利用可能高さ / 項目一覧.length) - 5);
-
-  項目一覧.forEach((項目, idx) => {
-    情報カードを作成(スライド, 余白.左, y, コンテンツ幅, 項目高さ, 項目.タイトル, 項目.説明, { 左ボーダー: true });
-    y += 項目高さ + 5;
-  });
+function URLを保存(url) {
+  const properties = PropertiesService.getScriptProperties();
+  properties.setProperty('LAST_PRESENTATION_URL', url);
 }
