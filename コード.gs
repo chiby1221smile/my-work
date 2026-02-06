@@ -1,9 +1,6 @@
 // ==========================================
-// CAMPFIREマーケティング戦略資料 - Gemini API版
+// CAMPFIREマーケティング戦略資料
 // ==========================================
-
-// 【重要】ここにあなたのGemini APIキーを入力してください
-const MY_API_KEY = "YOUR_API_KEY_HERE";
 
 // ==========================================
 // 定数設定
@@ -55,114 +52,11 @@ const フォントサイズ = {
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('🤖 CAMPFIRE AI戦略')
-    .addItem('🚀 戦略資料を自動生成（Gemini版）', '戦略資料を自動生成_Gemini')
-    .addItem('🔌 API接続テスト', 'APIテスト')
+  ui.createMenu('📊 CAMPFIRE戦略')
+    .addItem('🚀 戦略資料を自動生成', '戦略資料を自動生成')
     .addSeparator()
     .addItem('📂 最新資料のURL表示', '最新資料のURL表示')
     .addToUi();
-}
-
-// ==========================================
-// Gemini API接続関数（リトライ機能付き）
-// ==========================================
-
-/**
- * Gemini APIでテキストを生成（Not Found対策のリトライ機能付き）
- * @param {string} prompt - プロンプト
- * @return {string} 生成されたテキスト
- */
-function Geminiでテキスト生成(prompt) {
-  if (MY_API_KEY === "YOUR_API_KEY_HERE" || !MY_API_KEY) {
-    throw new Error("❌ APIキーが設定されていません。コード.gsの MY_API_KEY を設定してください。");
-  }
-
-  // 試行するモデルのリスト（優先順位順）
-  const モデルリスト = [
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-pro',
-    'gemini-1.5-pro'
-  ];
-
-  let 最後のエラー = null;
-
-  // 各モデルを順番に試行
-  for (let i = 0; i < モデルリスト.length; i++) {
-    const モデル名 = モデルリスト[i];
-    Logger.log(`🔄 モデル試行中: ${モデル名} (${i + 1}/${モデルリスト.length})`);
-
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${モデル名}:generateContent?key=${MY_API_KEY}`;
-
-      const payload = {
-        "contents": [{
-          "parts": [{
-            "text": prompt
-          }]
-        }],
-        "generationConfig": {
-          "temperature": 0.7,
-          "topK": 40,
-          "topP": 0.95,
-          "maxOutputTokens": 2048
-        }
-      };
-
-      const options = {
-        "method": "post",
-        "contentType": "application/json",
-        "payload": JSON.stringify(payload),
-        "muteHttpExceptions": true
-      };
-
-      const response = UrlFetchApp.fetch(url, options);
-      const responseCode = response.getResponseCode();
-
-      if (responseCode === 200) {
-        const result = JSON.parse(response.getContentText());
-
-        if (result.candidates && result.candidates[0] && result.candidates[0].content) {
-          const text = result.candidates[0].content.parts[0].text;
-          Logger.log(`✅ 成功: ${モデル名}で生成完了`);
-          return text;
-        }
-      } else if (responseCode === 404) {
-        Logger.log(`⚠️ モデル ${モデル名} が見つかりません（404 Not Found）`);
-        最後のエラー = `モデル ${モデル名} は利用できません`;
-        continue; // 次のモデルを試行
-      } else {
-        const errorText = response.getContentText();
-        Logger.log(`⚠️ エラー（${responseCode}）: ${errorText}`);
-        最後のエラー = `HTTP ${responseCode}: ${errorText}`;
-        continue;
-      }
-    } catch (e) {
-      Logger.log(`⚠️ 例外発生: ${e.message}`);
-      最後のエラー = e.message;
-      continue;
-    }
-  }
-
-  // すべてのモデルで失敗した場合
-  throw new Error(`❌ すべてのモデルで接続失敗しました。最後のエラー: ${最後のエラー}`);
-}
-
-// ==========================================
-// API接続テスト関数
-// ==========================================
-
-function APIテスト() {
-  try {
-    SpreadsheetApp.getUi().alert('🔌 API接続テスト開始\n\n簡単なテキストを生成します...');
-
-    const テストプロンプト = "「こんにちは」と日本語で一言返してください。";
-    const 結果 = Geminiでテキスト生成(テストプロンプト);
-
-    SpreadsheetApp.getUi().alert(`✅ API接続成功！\n\nGeminiの応答:\n${結果}`);
-  } catch (e) {
-    SpreadsheetApp.getUi().alert(`❌ API接続失敗\n\nエラー内容:\n${e.message}\n\n対処方法:\n1. MY_API_KEYが正しく設定されているか確認\n2. https://aistudio.google.com/app/apikey でAPIキーを確認`);
-  }
 }
 
 // ==========================================
